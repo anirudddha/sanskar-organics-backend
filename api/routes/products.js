@@ -1,6 +1,6 @@
 // routes/products.js
 const express = require('express');
-const { getDb } = require('../db'); // Import getDb to access the connected database
+const { getDb } = require('../../db'); // Import getDb to access the connected database
 
 const router = express.Router();
 

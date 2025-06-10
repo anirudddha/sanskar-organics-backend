@@ -2,7 +2,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { connectToMongoDB, closeMongoDB } = require('./db');
+const { connectToMongoDB, closeMongoDB } = require('../db');
 const productsRoutes = require('./routes/products');
 // REMOVED: const authRoutes = require('./routes/auth');
 // REMOVED: const authMiddleware = require('./middleware/authMiddleware');
