@@ -1,12 +1,10 @@
-// api/routes/products.js (Updated)
+// api/routes/products.js
 const express = require('express');
 const { getDb } = require('../db'); // Correct path to db.js (relative to api/routes)
 
 const router = express.Router();
 
 // Middleware to ensure DB is connected and attach it to the request object.
-// This handles the req.db = getDb() part. It's good practice to have this
-// per-route-group or globally if you use the same DB for all.
 router.use((req, res, next) => {
     try {
         req.db = getDb(); // Attach the database instance to the request
@@ -17,10 +15,9 @@ router.use((req, res, next) => {
 });
 
 // GET all products
+// This route is public.
 router.get('/', async (req, res) => {
     try {
-        // req.firebaseUser is available thanks to the firebaseAuthMiddleware
-        // console.log("Fetching products for Firebase user:", req.firebaseUser.uid);
         const products = await req.db.collection('products').find({}).toArray();
         res.json(products);
     } catch (error) {
@@ -30,9 +27,9 @@ router.get('/', async (req, res) => {
 });
 
 // GET a single product by ID (using the 'id' field, not _id)
+// This route is public.
 router.get('/:id', async (req, res) => {
     try {
-        console.log(`Fetching product ${req.params.id} for Firebase user:`, req.firebaseUser.uid);
         const productId = parseInt(req.params.id); // Convert ID to integer
         if (isNaN(productId)) {
             return res.status(400).json({ message: "Invalid product ID. Must be a number." });
@@ -51,11 +48,10 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST a new product
-// This route is now protected. We can also store the ID of the user who created the product.
+// This route is now public. Any authenticated user can add a product.
 router.post('/', async (req, res) => {
     try {
-        // Include the Firebase user's UID as 'createdBy'
-        const newProduct = { ...req.body, createdBy: req.firebaseUser.uid, createdAt: new Date() };
+        const newProduct = { ...req.body, createdAt: new Date() }; // Removed createdBy and createdAt from firebaseUser
 
         // Basic validation: ensure 'id', 'name', 'price', 'image', 'images' are present
         if (!newProduct.id || !newProduct.name || !newProduct.price || !newProduct.image || !newProduct.images) {
@@ -76,7 +72,7 @@ router.post('/', async (req, res) => {
 });
 
 // PUT (Update) an existing product by ID
-// This route is now protected. You can add logic to ensure only the creator can update.
+// This route is now public. Any user can update a product.
 router.put('/:id', async (req, res) => {
     try {
         const productId = parseInt(req.params.id);
@@ -86,13 +82,6 @@ router.put('/:id', async (req, res) => {
         const updatedProduct = req.body;
         delete updatedProduct._id; // Remove _id if present, as we're updating by 'id' field
         updatedProduct.updatedAt = new Date(); // Add an updated timestamp
-
-        // Optional: Add logic to ensure only the creator can update
-        // const productToUpdate = await req.db.collection('products').findOne({ id: productId });
-        // if (productToUpdate && productToUpdate.createdBy !== req.firebaseUser.uid) {
-        //     return res.status(403).json({ message: "Forbidden: You can only update products you created." });
-        // }
-
 
         const result = await req.db.collection('products').updateOne(
             { id: productId },
@@ -115,19 +104,13 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE a product by ID
-// This route is now protected. You can add logic to ensure only the creator can delete.
+// This route is now public. Any user can delete a product.
 router.delete('/:id', async (req, res) => {
     try {
         const productId = parseInt(req.params.id);
         if (isNaN(productId)) {
             return res.status(400).json({ message: "Invalid product ID. Must be a number." });
         }
-
-        // Optional: Add logic to ensure only the creator can delete
-        // const productToDelete = await req.db.collection('products').findOne({ id: productId });
-        // if (productToDelete && productToDelete.createdBy !== req.firebaseUser.uid) {
-        //     return res.status(403).json({ message: "Forbidden: You can only delete products you created." });
-        // }
 
         const result = await req.db.collection('products').deleteOne({ id: productId });
 
