@@ -29,7 +29,7 @@ app.get('/', (req, res) => {
 // All requests to /api/products will now require a valid Firebase ID token.
 // If you want some product routes (e.g., GET) to be public, you would need
 // to apply this middleware selectively within products.js or define separate public/private routes.
-app.use('/api/products', firebaseAuthMiddleware, productsRoutes);
+app.use('/api/products', productsRoutes);
 
 // Placeholder for other routes that will be protected
 // For example, if you add cart or order functionality, they would also be protected:

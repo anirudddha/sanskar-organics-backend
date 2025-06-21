@@ -20,7 +20,7 @@ router.use((req, res, next) => {
 router.get('/', async (req, res) => {
     try {
         // req.firebaseUser is available thanks to the firebaseAuthMiddleware
-        console.log("Fetching products for Firebase user:", req.firebaseUser.uid);
+        // console.log("Fetching products for Firebase user:", req.firebaseUser.uid);
         const products = await req.db.collection('products').find({}).toArray();
         res.json(products);
     } catch (error) {
