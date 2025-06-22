@@ -3,15 +3,8 @@ const express = require('express');
 const router = express.Router();
 const { ObjectId } = require('mongodb');
 
-// Middleware to ensure DB is connected and attach it to the request object.
-router.use((req, res, next) => {
-    try {
-        req.db = require('../db').getDb(); // Get the MongoDB connection instance
-        next();
-    } catch (error) {
-        res.status(500).json({ message: error.message || "Database not connected." });
-    }
-});
+const { getDb } = require('../db');
+
 
 // Helper function to validate address data
 const validateAddress = (address) => {
@@ -27,6 +20,7 @@ const validateAddress = (address) => {
 // POST (Add new address)
 router.post('/', async (req, res) => {
     try {
+        const db       = await getDb();
         const userId = req.firebaseUser.uid;
         const { address, isDefault } = req.body; // Expecting address object and an optional isDefault flag
 
@@ -41,7 +35,7 @@ router.post('/', async (req, res) => {
 
         // If isDefault is true, unset default from other addresses for this user
         if (isDefault) {
-            await req.db.collection('addresses').updateMany(
+            await db.collection('addresses').updateMany(
                 { userId: userId },
                 { $set: { isDefault: false } }
             );
@@ -54,7 +48,7 @@ router.post('/', async (req, res) => {
             createdAt: new Date()
         };
 
-        const result = await req.db.collection('addresses').insertOne(newAddress);
+        const result = await db.collection('addresses').insertOne(newAddress);
 
         res.status(201).json({ message: "Address added successfully", addressId: result.insertedId, address: newAddress });
 
@@ -67,9 +61,10 @@ router.post('/', async (req, res) => {
 // GET (View all addresses for the logged-in user)
 router.get('/', async (req, res) => {
     try {
+        const db       = await getDb();
         const userId = req.firebaseUser.uid;
 
-        const addresses = await req.db.collection('addresses')
+        const addresses = await db.collection('addresses')
             .find({ userId: userId })
             .sort({ isDefault: -1, createdAt: -1 }) // Default address first, then by creation date
             .toArray();
@@ -84,6 +79,7 @@ router.get('/', async (req, res) => {
 // GET (View a specific address by its MongoDB ID)
 router.get('/:addressId', async (req, res) => {
     try {
+        const db       = await getDb();
         const userId = req.firebaseUser.uid;
         const addressId = req.params.addressId;
 
@@ -91,7 +87,7 @@ router.get('/:addressId', async (req, res) => {
             return res.status(400).json({ message: "Invalid address ID format." });
         }
 
-        const address = await req.db.collection('addresses').findOne({
+        const address = await db.collection('addresses').findOne({
             _id: new ObjectId(addressId),
             userId: userId // Ensure the user is fetching their own address
         });
@@ -110,6 +106,7 @@ router.get('/:addressId', async (req, res) => {
 // PUT (Update an existing address)
 router.put('/:addressId', async (req, res) => {
     try {
+        const db       = await getDb();
         const userId = req.firebaseUser.uid;
         const addressId = req.params.addressId;
         const { address, isDefault } = req.body; // Updated address properties and flag
@@ -132,7 +129,7 @@ router.put('/:addressId', async (req, res) => {
 
         // If isDefault is true, unset default from other addresses for this user
         if (isDefault === true) {
-            await req.db.collection('addresses').updateMany(
+            await db.collection('addresses').updateMany(
                 { userId: userId, _id: { $ne: new ObjectId(addressId) } }, // Exclude the current address
                 { $set: { isDefault: false } }
             );
@@ -154,7 +151,7 @@ router.put('/:addressId', async (req, res) => {
             updateFields.isDefault = isDefault;
         }
 
-        const result = await req.db.collection('addresses').updateOne(
+        const result = await db.collection('addresses').updateOne(
             { _id: new ObjectId(addressId), userId: userId },
             { $set: updateFields }
         );
@@ -167,7 +164,7 @@ router.put('/:addressId', async (req, res) => {
         }
 
         // Fetch the updated address to return
-        const updatedAddress = await req.db.collection('addresses').findOne({ _id: new ObjectId(addressId) });
+        const updatedAddress = await db.collection('addresses').findOne({ _id: new ObjectId(addressId) });
 
         res.json({ message: "Address updated successfully", address: updatedAddress });
 
@@ -180,6 +177,7 @@ router.put('/:addressId', async (req, res) => {
 // DELETE (Remove an address)
 router.delete('/:addressId', async (req, res) => {
     try {
+        const db       = await getDb();
         const userId = req.firebaseUser.uid;
         const addressId = req.params.addressId;
 
@@ -190,19 +188,19 @@ router.delete('/:addressId', async (req, res) => {
         // Optional: Check if the address to be deleted is the default one.
         // If it is, you might want to automatically set another address as default
         // or prevent deletion if it's the last address.
-        const addressToDelete = await req.db.collection('addresses').findOne({ _id: new ObjectId(addressId), userId: userId });
+        const addressToDelete = await db.collection('addresses').findOne({ _id: new ObjectId(addressId), userId: userId });
         if (!addressToDelete) {
             return res.status(404).json({ message: "Address not found or does not belong to the user." });
         }
 
         if (addressToDelete.isDefault) {
             // Find another address for this user and set it as default
-            const nextDefaultAddress = await req.db.collection('addresses').findOne({
+            const nextDefaultAddress = await db.collection('addresses').findOne({
                 userId: userId,
                 _id: { $ne: new ObjectId(addressId) } // Not the one being deleted
             });
             if (nextDefaultAddress) {
-                await req.db.collection('addresses').updateOne(
+                await db.collection('addresses').updateOne(
                     { _id: nextDefaultAddress._id },
                     { $set: { isDefault: true } }
                 );
@@ -213,7 +211,7 @@ router.delete('/:addressId', async (req, res) => {
             }
         }
 
-        const result = await req.db.collection('addresses').deleteOne({ _id: new ObjectId(addressId), userId: userId });
+        const result = await db.collection('addresses').deleteOne({ _id: new ObjectId(addressId), userId: userId });
 
         if (result.deletedCount > 0) {
             res.json({ message: "Address deleted successfully." });

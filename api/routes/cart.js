@@ -1,23 +1,15 @@
 // api/routes/cart.js
 const express = require('express');
 const router = express.Router();
-const { ObjectId } = require('mongodb'); // For potentially storing MongoDB ObjectId if needed
-
-// Middleware to ensure DB is connected and attach it to the request object.
-router.use((req, res, next) => {
-    try {
-        req.db = require('../db').getDb(); // Get the MongoDB connection instance
-        next();
-    } catch (error) {
-        res.status(500).json({ message: error.message || "Database not connected." });
-    }
-});
+const { getDb } = require('../db');
+const { ObjectId } = require('mongodb');
 
 // GET user's cart
 router.get('/', async (req, res) => {
     try {
+        const db       = await getDb();
         const userId = req.firebaseUser.uid;
-        const cart = await req.db.collection('carts').findOne({ userId: userId });
+        const cart = await db.collection('carts').findOne({ userId: userId });
 
         if (cart) {
             // Ensure prices are numbers when retrieved, in case they were stored as strings or invalid
@@ -39,6 +31,7 @@ router.get('/', async (req, res) => {
 // POST (Add/Update item to cart)
 router.post('/', async (req, res) => {
     try {
+        const db       = await getDb();
         const userId = req.firebaseUser.uid;
         const { productId, quantity, selectedVariant } = req.body;
 
@@ -47,7 +40,7 @@ router.post('/', async (req, res) => {
         }
 
         // Fetch product details to ensure it exists and get name/price/variants
-        const product = await req.db.collection('products').findOne({ id: parseInt(productId) });
+        const product = await db.collection('products').findOne({ id: parseInt(productId) });
         if (!product) {
             return res.status(404).json({ message: `Product with ID ${productId} not found.` });
         }
@@ -76,7 +69,7 @@ router.post('/', async (req, res) => {
         const sanitizedQuantity = typeof quantity === 'number' ? quantity : 1;
 
         // Find the user's cart or create one
-        let cart = await req.db.collection('carts').findOne({ userId: userId });
+        let cart = await db.collection('carts').findOne({ userId: userId });
 
         if (!cart) {
             cart = {
@@ -115,7 +108,7 @@ router.post('/', async (req, res) => {
         cart.updatedAt = new Date();
 
         // Update or insert the cart
-        const result = await req.db.collection('carts').updateOne(
+        const result = await db.collection('carts').updateOne(
             { userId: userId },
             { $set: cart },
             { upsert: true }
@@ -140,6 +133,7 @@ router.post('/', async (req, res) => {
 // If you need to remove a SPECIFIC variant, the route might need to be like /cart/item/:itemId or /cart/:productId/:variantUnit
 router.delete('/:productId', async (req, res) => {
     try {
+        const db       = await getDb();
         const userId = req.firebaseUser.uid;
         const productIdToRemove = parseInt(req.params.productId);
         // To remove a specific variant, you'd need its unit or a unique cart item ID.
@@ -150,7 +144,7 @@ router.delete('/:productId', async (req, res) => {
             return res.status(400).json({ message: "Invalid product ID. Must be a number." });
         }
 
-        const cart = await req.db.collection('carts').findOne({ userId: userId });
+        const cart = await db.collection('carts').findOne({ userId: userId });
 
         if (!cart) {
             return res.status(404).json({ message: "Cart not found." });
@@ -169,10 +163,10 @@ router.delete('/:productId', async (req, res) => {
         cart.updatedAt = new Date();
 
         if (cart.items.length === 0) {
-            await req.db.collection('carts').deleteOne({ userId: userId });
+            await db.collection('carts').deleteOne({ userId: userId });
             res.json({ message: "Item removed from cart. Cart is now empty and has been deleted." });
         } else {
-            await req.db.collection('carts').updateOne(
+            await db.collection('carts').updateOne(
                 { userId: userId },
                 { $set: cart }
             );
@@ -187,8 +181,9 @@ router.delete('/:productId', async (req, res) => {
 // DELETE (Clear entire cart)
 router.delete('/', async (req, res) => {
     try {
+        const db       = await getDb();
         const userId = req.firebaseUser.uid;
-        const result = await req.db.collection('carts').deleteOne({ userId: userId });
+        const result = await db.collection('carts').deleteOne({ userId: userId });
 
         if (result.deletedCount > 0) {
             res.json({ message: "Cart cleared successfully." });

@@ -1,62 +1,27 @@
 // db.js
 const { MongoClient, ServerApiVersion } = require('mongodb');
 
-let _db; // Private variable to hold the database instance
-let _client; // Private variable to hold the MongoClient instance
+const uri = process.env.MONGODB_URI;
+if (!uri) {
+  console.error("MONGODB_URI is not defined.");
+  process.exit(1);
+}
 
-const connectToMongoDB = async () => {
-    const uri = process.env.MONGODB_URI;
-
-    if (!uri) {
-        console.error("MONGODB_URI is not defined in .env file.");
-        process.exit(1); // Exit if connection string is missing
+// Cache the connect() promise in the global scope to survive hot-reloads
+if (!global._mongoClientPromise) {
+  const client = new MongoClient(uri, {
+    serverApi: {
+      version: ServerApiVersion.v1,
+      strict: true,
+      deprecationErrors: true,
     }
+  });
+  global._mongoClientPromise = client.connect();
+}
 
-    _client = new MongoClient(uri, {
-        serverApi: {
-            version: ServerApiVersion.v1,
-            strict: true,
-            deprecationErrors: true,
-        }
-    });
+async function getDb() {
+  const client = await global._mongoClientPromise;
+  return client.db('SanskarOrganics');
+}
 
-    try {
-        await _client.connect();
-        _db = _client.db('SanskarOrganics'); // Replace with your actual database name on Atlas
-        console.log("Connected to MongoDB Atlas!");
-        return _db;
-    } catch (error) {
-        console.error("Error connecting to MongoDB Atlas:", error);
-        throw error; // Propagate the error
-    }
-};
-
-const getDb = () => {
-    if (!_db) {
-        throw Error('No database found! Please connect first.');
-    }
-    return _db;
-};
-
-const getClient = () => {
-    if (!_client) {
-        throw Error('No MongoDB client found! Please connect first.');
-    }
-    return _client;
-};
-
-const closeMongoDB = async () => {
-    if (_client) {
-        await _client.close();
-        console.log("MongoDB connection closed.");
-        _db = null; // Clear the database instance
-        _client = null; // Clear the client instance
-    }
-};
-
-module.exports = {
-    connectToMongoDB,
-    getDb,
-    getClient,
-    closeMongoDB
-};
+module.exports = { getDb };
