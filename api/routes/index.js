@@ -26,4 +26,6 @@ router.use('/cart', firebaseAuthMiddleware, require('./cart'));
 router.use('/orders', firebaseAuthMiddleware, require('./orders'));
 router.use('/addresses', firebaseAuthMiddleware, require('./addresses'));
 
+router.use('/admin', require('./admin')); 
+
 module.exports = router;
