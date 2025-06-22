@@ -1,31 +1,23 @@
 // api/routes/reviews.js
 const express = require('express');
 const router = express.Router();
-const { ObjectId } = require('mongodb');
 const firebaseAuthMiddleware = require('../middleware/firebaseAuthMiddleware');
-
-// Middleware to ensure DB is connected and attach it to the request object.
-router.use((req, res, next) => {
-    try {
-        req.db = require('../db').getDb();
-        next();
-    } catch (error) {
-        res.status(500).json({ message: error.message || "Database not connected." });
-    }
-});
+const { getDb } = require('../db');
+const { ObjectId } = require('mongodb');
 
 // --- PUBLIC ROUTE ---
 
 // GET reviews for a specific product
 router.get('/product/:productId', async (req, res) => {
     try {
+        const db       = await getDb();
         const productId = parseInt(req.params.productId);
 
         if (isNaN(productId)) {
             return res.status(400).json({ message: "Invalid product ID. Must be a number." });
         }
 
-        const reviews = await req.db.collection('reviews')
+        const reviews = await db.collection('reviews')
             .find({ productId: productId })
             .sort({ reviewDate: -1 })
             .toArray();
@@ -44,6 +36,7 @@ router.get('/product/:productId', async (req, res) => {
 
 router.post('/', firebaseAuthMiddleware, async (req, res) => {
     try {
+        const db       = await getDb();
         const userId = req.firebaseUser.uid;
         const { productId, rating, comment, userName } = req.body;
 
@@ -56,7 +49,7 @@ router.post('/', firebaseAuthMiddleware, async (req, res) => {
 
         // Assuming product ID is stored as an integer in the 'products' collection 'id' field.
         // Adjust if your 'products' collection uses _id: ObjectId.
-        const product = await req.db.collection('products').findOne({ id: parseInt(productId) });
+        const product = await db.collection('products').findOne({ id: parseInt(productId) });
         if (!product) {
             return res.status(404).json({ message: `Product with ID ${productId} not found.` });
         }
@@ -74,7 +67,7 @@ router.post('/', firebaseAuthMiddleware, async (req, res) => {
             reviewDate: new Date()
         };
 
-        const result = await req.db.collection('reviews').insertOne(review);
+        const result = await db.collection('reviews').insertOne(review);
 
         res.status(201).json({
             message: "Review submitted successfully!",
@@ -99,9 +92,10 @@ router.post('/', firebaseAuthMiddleware, async (req, res) => {
 // GET reviews for the currently logged-in user
 router.get('/my-reviews', firebaseAuthMiddleware, async (req, res) => {
     try {
+        const db       = await getDb();
         const userId = req.firebaseUser.uid;
 
-        const userReviews = await req.db.collection('reviews')
+        const userReviews = await db.collection('reviews')
             .find({ userId: userId })
             .sort({ reviewDate: -1 })
             .toArray();

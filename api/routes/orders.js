@@ -1,21 +1,14 @@
 // api/routes/orders.js
 const express = require('express');
 const router = express.Router();
+const { getDb } = require('../db');
 const { ObjectId } = require('mongodb');
 
-// Middleware to ensure DB is connected and attach it to the request object.
-router.use((req, res, next) => {
-    try {
-        req.db = require('../db').getDb();
-        next();
-    } catch (error) {
-        res.status(500).json({ message: error.message || "Database not connected." });
-    }
-});
 
 // POST (Create Order) - From Cart
 router.post('/', async (req, res) => {
     try {
+        const db       = await getDb();
         const userId = req.firebaseUser.uid;
         const { selectedAddressId } = req.body; // Expecting selectedAddressId
 
@@ -28,14 +21,14 @@ router.post('/', async (req, res) => {
         }
 
         // Fetch the user's cart
-        const cart = await req.db.collection('carts').findOne({ userId: userId });
+        const cart = await db.collection('carts').findOne({ userId: userId });
 
         if (!cart || !cart.items || cart.items.length === 0) {
             return res.status(400).json({ message: "Your cart is empty. Add items before creating an order." });
         }
 
         // Fetch the selected shipping address for the user
-        const shippingAddress = await req.db.collection('addresses').findOne({
+        const shippingAddress = await db.collection('addresses').findOne({
             _id: new ObjectId(selectedAddressId),
             userId: userId
         });
@@ -75,10 +68,10 @@ router.post('/', async (req, res) => {
         };
 
         // Insert the order into the 'orders' collection
-        const orderResult = await req.db.collection('orders').insertOne(order);
+        const orderResult = await db.collection('orders').insertOne(order);
 
         // Clear the user's cart after successful order creation
-        await req.db.collection('carts').deleteOne({ userId: userId });
+        await db.collection('carts').deleteOne({ userId: userId });
 
         res.status(201).json({ message: "Order placed successfully!", orderId: orderResult.insertedId, order: order });
 
@@ -91,8 +84,9 @@ router.post('/', async (req, res) => {
 // GET user's order history
 router.get('/', async (req, res) => {
     try {
+        const db       = await getDb();
         const userId = req.firebaseUser.uid;
-        const orders = await req.db.collection('orders')
+        const orders = await db.collection('orders')
             .find({ userId: userId })
             .sort({ orderDate: -1 })
             .toArray();
@@ -106,6 +100,7 @@ router.get('/', async (req, res) => {
 // GET a specific order by its ID (for the current user)
 router.get('/:orderId', async (req, res) => {
     try {
+        const db       = await getDb();
         const userId = req.firebaseUser.uid;
         const orderId = req.params.orderId;
 
@@ -113,7 +108,7 @@ router.get('/:orderId', async (req, res) => {
             return res.status(400).json({ message: "Invalid order ID format." });
         }
 
-        const order = await req.db.collection('orders').findOne({
+        const order = await db.collection('orders').findOne({
             _id: new ObjectId(orderId),
             userId: userId
         });
@@ -132,6 +127,7 @@ router.get('/:orderId', async (req, res) => {
 
 router.post('/direct', async (req, res) => { // Changed path to '/direct'
     try {
+        const db       = await getDb();
         const userId = req.firebaseUser.uid;
         const { selectedAddressId, items } = req.body; // Expecting selectedAddressId and an 'items' array
 
@@ -152,7 +148,7 @@ router.post('/direct', async (req, res) => { // Changed path to '/direct'
         // Optional: Further validation to ensure the item is not marked as 'cartItem' if your items have such flags.
 
         // Fetch the selected shipping address for the user
-        const shippingAddress = await req.db.collection('addresses').findOne({
+        const shippingAddress = await db.collection('addresses').findOne({
             _id: new ObjectId(selectedAddressId),
             userId: userId
         });
@@ -195,7 +191,7 @@ router.post('/direct', async (req, res) => { // Changed path to '/direct'
         };
 
         // Insert the order into the 'orders' collection
-        const orderResult = await req.db.collection('orders').insertOne(order);
+        const orderResult = await db.collection('orders').insertOne(order);
 
         // *** IMPORTANT ***: We DO NOT clear the cart here because this order was NOT from the cart.
 
