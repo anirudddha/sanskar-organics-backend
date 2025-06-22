@@ -12,11 +12,24 @@ initializeFirebaseAdmin();
 const apiRoutes = require('./routes');
 const app = express();
 
+// build your whitelist
+const allowedOrigins = [
+  process.env.FRONTEND_URL,    // e.g. https://your-frontend.vercel.app
+  'http://localhost:5173',    
+];
+
 app.use(express.json());
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production'
-    ? process.env.FRONTEND_URL
-    : '*',
+  origin(origin, callback) {
+    // allow requests with no origin (e.g. mobile apps, curl)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      // origin is whitelisted
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS: Origin ${origin} not allowed`));
+    }
+  },
   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
   credentials: true,
   optionsSuccessStatus: 204
