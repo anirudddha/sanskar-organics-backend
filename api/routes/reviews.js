@@ -40,10 +40,12 @@ router.get('/product/:productId', async (req, res) => {
 // --- PROTECTED ROUTES ---
 
 // POST (Add Review) - User must be authenticated
+// api/routes/reviews.js (only the POST / endpoint)
+
 router.post('/', firebaseAuthMiddleware, async (req, res) => {
     try {
         const userId = req.firebaseUser.uid;
-        const { productId, rating, comment } = req.body;
+        const { productId, rating, comment, userName } = req.body;
 
         if (!productId || !rating || !comment) {
             return res.status(400).json({ message: "productId, rating, and comment are required." });
@@ -52,22 +54,41 @@ router.post('/', firebaseAuthMiddleware, async (req, res) => {
             return res.status(400).json({ message: "Rating must be between 1 and 5." });
         }
 
+        // Assuming product ID is stored as an integer in the 'products' collection 'id' field.
+        // Adjust if your 'products' collection uses _id: ObjectId.
         const product = await req.db.collection('products').findOne({ id: parseInt(productId) });
         if (!product) {
             return res.status(404).json({ message: `Product with ID ${productId} not found.` });
         }
 
+        const reviewUserName = (userName && userName.trim().length > 0)
+            ? userName.trim()
+            : (req.firebaseUser.name || req.firebaseUser.email || 'Anonymous');
+
         const review = {
             productId: parseInt(productId),
             userId: userId,
-            userName: req.firebaseUser.name || req.firebaseUser.email || 'Anonymous',
+            userName: reviewUserName,
             rating: rating,
             comment: comment,
             reviewDate: new Date()
         };
 
         const result = await req.db.collection('reviews').insertOne(review);
-        res.status(201).json({ message: "Review submitted successfully!", reviewId: result.insertedId, review: review });
+
+        res.status(201).json({
+            message: "Review submitted successfully!",
+            reviewId: result.insertedId,
+            review: {
+                _id: result.insertedId,
+                productId: parseInt(productId),
+                userId: userId,
+                userName: reviewUserName,
+                rating: rating,
+                comment: comment,
+                reviewDate: review.reviewDate,
+            }
+        });
 
     } catch (error) {
         console.error("Error submitting review:", error);
