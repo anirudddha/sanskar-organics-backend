@@ -1,31 +1,24 @@
-// api/index.js (Main server entry point)
-require('dotenv').config({ path: './.env' }); // Load environment variables from api/.env
+// api/index.js (Main server entry point for Vercel)
+
+require('dotenv').config({ path: './.env' });
 
 const express = require('express');
 const cors = require('cors');
 
-const { connectToMongoDB } = require('./db'); // Correct path relative to api/
-// No need to initialize Firebase here as it's handled by the main router setup for safety.
-// const { initializeFirebaseAdmin } = require('./config/firebaseConfig');
-// const firebaseAuthMiddleware = require('./middleware/firebaseAuthMiddleware');
+const { connectToMongoDB } = require('./db');
 
-const apiRoutes = require('./routes'); // Import the main api router
+const apiRoutes = require('./routes'); // This should be './routes/index.js'
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
 // Middleware
-app.use(express.json()); // For parsing JSON request bodies
-// Configure CORS for production: restrict origins
+app.use(express.json());
 app.use(cors({
-    origin: '*', // Allow all origins for development. Change to your frontend URL in production.
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    credentials: true, // If you use cookies or sessions
+    origin: process.env.NODE_ENV === 'production' ? process.env.FRONTEND_URL : '*',
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    credentials: true,
     optionsSuccessStatus: 204
 }));
-
-// Initialize Firebase Admin SDK - moved to api/routes/index.js for better structure
-// initializeFirebaseAdmin(); // Removed from here
 
 // Mount the main API router under '/api'
 app.use('/api', apiRoutes);
@@ -41,28 +34,18 @@ app.use((err, req, res, next) => {
     res.status(500).json({ message: 'Something went wrong on the server', error: err.message });
 });
 
-// Start the server only after connecting to the MongoDB database
-connectToMongoDB()
-    .then(() => {
-        app.listen(PORT, () => {
-            console.log(`Server running on http://localhost:${PORT}`);
-        });
-    })
-    .catch(error => {
-        console.error("Failed to start server due to database connection error:", error);
-        process.exit(1); // Exit the process if DB connection fails
-    });
+async function ensureDbConnection() {
+    try {
+        await connectToMongoDB();
+        console.log("Database connected.");
+    } catch (error) {
+        console.error("Database connection failed:", error);
+        throw error;
+    }
+}
 
-// Handle graceful server shutdown (e.g., Ctrl+C)
-process.on('SIGINT', async () => {
-    console.log('Server is shutting down...');
-    await require('./db').closeMongoDB(); // Ensure MongoDB connection is closed
-    process.exit(0);
-});
+// Call setup function
+ensureDbConnection();
 
-// Handle graceful server shutdown (e.g., Kubernetes, systemd)
-process.on('SIGTERM', async () => {
-    console.log('Server is shutting down...');
-    await require('./db').closeMongoDB(); // Ensure MongoDB connection is closed
-    process.exit(0);
-});
+// Export the Express app instance for Vercel's @vercel/node builder
+module.exports = app;
