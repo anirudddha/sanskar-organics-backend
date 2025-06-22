@@ -16,7 +16,7 @@ const app = express();
 const allowedOrigins = [
   process.env.FRONTEND_URL,    // e.g. https://your-frontend.vercel.app
   'http://localhost:5173',
-  'https://sanskar-organics-admin.vercel.app/',
+  'https://sanskar-organics-admin.vercel.app',
 ];
 
 app.use(express.json());
