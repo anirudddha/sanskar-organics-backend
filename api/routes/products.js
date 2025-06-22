@@ -1,21 +1,22 @@
 // api/routes/products.js
 const express = require('express');
-const { getDb } = require('../db'); // Correct path to db.js (relative to api/routes)
-
 const router = express.Router();
+const { getDb } = require('../db'); 
+const firebaseAuthMiddleware = require('../middleware/firebaseAuthMiddleware');
 
-// Middleware to ensure DB is connected and attach it to the request object.
+// Middleware to attach the DB instance to each request in this router.
 router.use((req, res, next) => {
     try {
-        req.db = getDb(); // Attach the database instance to the request
+        req.db = getDb();
         next();
     } catch (error) {
         res.status(500).json({ message: error.message || "Database not connected." });
     }
 });
 
+// --- PUBLIC ROUTES ---
+
 // GET all products
-// This route is public.
 router.get('/', async (req, res) => {
     try {
         const products = await req.db.collection('products').find({}).toArray();
@@ -26,11 +27,10 @@ router.get('/', async (req, res) => {
     }
 });
 
-// GET a single product by ID (using the 'id' field, not _id)
-// This route is public.
+// GET a single product by ID
 router.get('/:id', async (req, res) => {
     try {
-        const productId = parseInt(req.params.id); // Convert ID to integer
+        const productId = parseInt(req.params.id);
         if (isNaN(productId)) {
             return res.status(400).json({ message: "Invalid product ID. Must be a number." });
         }
@@ -41,23 +41,26 @@ router.get('/:id', async (req, res) => {
         } else {
             res.status(404).json({ message: "Product not found." });
         }
-    } catch (error) {
+    } catch (error) { // FIX: Removed the erroneous '=>' from this line
         console.error(`Error fetching product with ID ${req.params.id}:`, error);
         res.status(500).json({ message: "Error fetching product", error: error.message });
     }
 });
 
-// POST a new product
-// This route is now public. Any authenticated user can add a product.
-router.post('/', async (req, res) => {
-    try {
-        const newProduct = { ...req.body, createdAt: new Date() }; // Removed createdBy and createdAt from firebaseUser
+// --- PROTECTED ROUTES (Require Authentication) ---
 
-        // Basic validation: ensure 'id', 'name', 'price', 'image', 'images' are present
+// POST a new product (Protected)
+router.post('/', firebaseAuthMiddleware, async (req, res) => {
+    try {
+        const newProduct = { 
+            ...req.body, 
+            createdBy: req.firebaseUser.uid, // Optionally track who created it
+            createdAt: new Date() 
+        };
+
         if (!newProduct.id || !newProduct.name || !newProduct.price || !newProduct.image || !newProduct.images) {
             return res.status(400).json({ message: "Missing required product fields (id, name, price, image, images)." });
         }
-        // Check if a product with the same 'id' already exists
         const existingProduct = await req.db.collection('products').findOne({ id: newProduct.id });
         if (existingProduct) {
             return res.status(409).json({ message: `Product with ID ${newProduct.id} already exists.` });
@@ -71,17 +74,17 @@ router.post('/', async (req, res) => {
     }
 });
 
-// PUT (Update) an existing product by ID
-// This route is now public. Any user can update a product.
-router.put('/:id', async (req, res) => {
+// PUT (Update) an existing product by ID (Protected)
+router.put('/:id', firebaseAuthMiddleware, async (req, res) => {
     try {
         const productId = parseInt(req.params.id);
         if (isNaN(productId)) {
             return res.status(400).json({ message: "Invalid product ID. Must be a number." });
         }
         const updatedProduct = req.body;
-        delete updatedProduct._id; // Remove _id if present, as we're updating by 'id' field
-        updatedProduct.updatedAt = new Date(); // Add an updated timestamp
+        delete updatedProduct._id;
+        updatedProduct.updatedAt = new Date();
+        updatedProduct.updatedBy = req.firebaseUser.uid; // Optionally track who updated it
 
         const result = await req.db.collection('products').updateOne(
             { id: productId },
@@ -89,11 +92,7 @@ router.put('/:id', async (req, res) => {
         );
 
         if (result.matchedCount > 0) {
-            if (result.modifiedCount > 0) {
-                res.json({ message: "Product updated successfully." });
-            } else {
-                res.status(200).json({ message: "Product found but no changes applied." });
-            }
+            res.json({ message: "Product updated successfully." });
         } else {
             res.status(404).json({ message: "Product not found." });
         }
@@ -103,9 +102,8 @@ router.put('/:id', async (req, res) => {
     }
 });
 
-// DELETE a product by ID
-// This route is now public. Any user can delete a product.
-router.delete('/:id', async (req, res) => {
+// DELETE a product by ID (Protected)
+router.delete('/:id', firebaseAuthMiddleware, async (req, res) => {
     try {
         const productId = parseInt(req.params.id);
         if (isNaN(productId)) {
