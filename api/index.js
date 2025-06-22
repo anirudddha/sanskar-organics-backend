@@ -15,7 +15,9 @@ const app = express();
 // build your whitelist
 const allowedOrigins = [
   process.env.FRONTEND_URL,    // e.g. https://your-frontend.vercel.app
-  'http://localhost:5173',    
+  'http://localhost:5173',
+  'capacitor://localhost',
+  'http://localhost:8100',
 ];
 
 app.use(express.json());
