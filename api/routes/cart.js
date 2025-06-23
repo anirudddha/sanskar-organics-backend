@@ -57,6 +57,8 @@ router.post('/', async (req, res) => {
             // Use the price and unit from the selected variant
 
             if (variantDetails) {
+                itemPrice = variantDetails.price;
+                itemUnit = variantDetails.unit;
                 itemVariantDetails = variantDetails;
             }
             else {
