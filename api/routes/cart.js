@@ -97,7 +97,7 @@ router.post('/', async (req, res) => {
 
         if (existingItemIndex > -1) {
             // Item (with this variant) already exists, update quantity
-            cart.items[existingItemIndex].quantity += sanitizedQuantity;
+            cart.items[existingItemIndex].quantity = sanitizedQuantity;
             // Important: If price could change for a variant, you might need to re-evaluate.
             // For simplicity, we keep the price from when it was first added or updated.
             // cart.items[existingItemIndex].price = sanitizedPrice; // Option to update price if needed
