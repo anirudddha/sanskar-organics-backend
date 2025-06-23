@@ -7,7 +7,7 @@ const { ObjectId } = require('mongodb');
 // GET user's cart
 router.get('/', async (req, res) => {
     try {
-        const db       = await getDb();
+        const db = await getDb();
         const userId = req.firebaseUser.uid;
         const cart = await db.collection('carts').findOne({ userId: userId });
 
@@ -31,7 +31,7 @@ router.get('/', async (req, res) => {
 // POST (Add/Update item to cart)
 router.post('/', async (req, res) => {
     try {
-        const db       = await getDb();
+        const db = await getDb();
         const userId = req.firebaseUser.uid;
         const { productId, quantity, selectedVariant, variantDetails } = req.body;
 
@@ -142,9 +142,10 @@ router.post('/', async (req, res) => {
 // If you need to remove a SPECIFIC variant, the route might need to be like /cart/item/:itemId or /cart/:productId/:variantUnit
 router.delete('/:productId', async (req, res) => {
     try {
-        const db       = await getDb();
+        const db = await getDb();
         const userId = req.firebaseUser.uid;
         const productIdToRemove = parseInt(req.params.productId);
+        const variantUnit = req.body.variant;
         // To remove a specific variant, you'd need its unit or a unique cart item ID.
         // For now, we'll assume it removes ALL instances of this productId from the cart.
         // If you need to remove a specific variant, the frontend needs to send that info.
@@ -163,7 +164,10 @@ router.delete('/:productId', async (req, res) => {
         // Filter out the item to remove based on productId.
         // If you need to remove a SPECIFIC variant, you'd add another condition here,
         // e.g., `item => item.productId !== productIdToRemove || item.unit !== req.body.variantUnitToRemove`
-        cart.items = cart.items.filter(item => item.productId !== productIdToRemove);
+        cart.items = cart.items.filter(item =>
+            item.productId !== productIdToRemove
+            || item.variantDetails?.unit !== variantUnit
+        );
 
         if (cart.items.length === initialItemCount) {
             return res.status(404).json({ message: `Product with ID ${productIdToRemove} not found in cart.` });
@@ -190,7 +194,7 @@ router.delete('/:productId', async (req, res) => {
 // DELETE (Clear entire cart)
 router.delete('/', async (req, res) => {
     try {
-        const db       = await getDb();
+        const db = await getDb();
         const userId = req.firebaseUser.uid;
         const result = await db.collection('carts').deleteOne({ userId: userId });
 
