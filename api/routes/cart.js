@@ -33,7 +33,7 @@ router.post('/', async (req, res) => {
     try {
         const db       = await getDb();
         const userId = req.firebaseUser.uid;
-        const { productId, quantity, selectedVariant } = req.body;
+        const { productId, quantity, selectedVariant, variantDetails } = req.body;
 
         if (!productId || !quantity || quantity <= 0) {
             return res.status(400).json({ message: "productId and quantity are required, and quantity must be positive." });
@@ -50,18 +50,25 @@ router.post('/', async (req, res) => {
         let itemVariantDetails = null; // To store variant info like { unit, price }
 
         if (product.variants && product.variants.length > 0) {
-            if (!selectedVariant || selectedVariant.unit === undefined || selectedVariant.price === undefined) {
+            if ((!selectedVariant || selectedVariant.unit === undefined || selectedVariant.price === undefined) && !variantDetails) {
                 // If product has variants, frontend MUST send selectedVariant details
                 return res.status(400).json({ message: "Selected variant details are required for this product." });
             }
             // Use the price and unit from the selected variant
-            itemPrice = selectedVariant.price;
-            itemUnit = selectedVariant.unit;
-            // Store the variant details for matching later
-            itemVariantDetails = {
-                unit: selectedVariant.unit,
-                price: selectedVariant.price // Store the price from the variant
-            };
+
+            if (variantDetails) {
+                itemVariantDetails = variantDetails;
+            }
+            else {
+                itemPrice = selectedVariant.price;
+                itemUnit = selectedVariant.unit;
+                // Store the variant details for matching later
+                itemVariantDetails = {
+                    unit: selectedVariant.unit,
+                    price: selectedVariant.price // Store the price from the variant
+                };
+            }
+
         }
 
         // Sanitize price and quantity before storing
