@@ -1,4 +1,4 @@
-// api/routes/testimonials.js
+// api/routes/testimonials.js (backend)
 const express = require('express');
 const router = express.Router();
 const firebaseAuthMiddleware = require('../middleware/firebaseAuthMiddleware');
@@ -47,10 +47,14 @@ router.post('/', firebaseAuthMiddleware, async (req, res) => {
   try {
     const db = await getDb();
     const userId = req.firebaseUser.uid;
-    const { message, userName } = req.body;
+    const { message, userName, stars } = req.body; // <-- Destructure 'stars' here
 
     if (!message || message.trim().length === 0) {
       return res.status(400).json({ message: 'Message is required.' });
+    }
+    // --- Add validation for stars ---
+    if (typeof stars !== 'number' || stars < 1 || stars > 5) {
+      return res.status(400).json({ message: 'Invalid star rating. Please provide a number between 1 and 5.' });
     }
 
     const name = userName && userName.trim().length > 0
@@ -61,6 +65,7 @@ router.post('/', firebaseAuthMiddleware, async (req, res) => {
       userId,
       userName: name,
       message: message.trim(),
+      stars: stars, // <-- Store the stars value
       date: new Date()
     };
 
@@ -69,10 +74,11 @@ router.post('/', firebaseAuthMiddleware, async (req, res) => {
     res.status(201).json({
       message: 'Testimonial submitted successfully!',
       testimonialId: result.insertedId,
-      testimonial: { _id: result.insertedId, ...testimonial }
+      testimonial: { _id: result.insertedId, ...testimonial } // Return the stored testimonial with stars
     });
   } catch (error) {
     console.error('Error submitting testimonial:', error);
+    // Specific error handling for invalid stars might be good here too, if needed.
     res.status(500).json({ message: 'Error submitting testimonial', error: error.message });
   }
 });
