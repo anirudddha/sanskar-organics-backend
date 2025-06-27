@@ -1,0 +1,98 @@
+// api/routes/testimonials.js
+const express = require('express');
+const router = express.Router();
+const firebaseAuthMiddleware = require('../middleware/firebaseAuthMiddleware');
+const { getDb } = require('../db');
+const { ObjectId } = require('mongodb');
+
+
+router.get('/', async (req, res) => {
+  try {
+    const db = await getDb();
+    const testimonials = await db.collection('testimonials')
+      .find({})
+      .sort({ date: -1 })
+      .toArray();
+
+    res.json(testimonials);
+  } catch (error) {
+    console.error('Error fetching testimonials:', error);
+    res.status(500).json({ message: 'Error fetching testimonials', error: error.message });
+  }
+});
+
+
+router.get('/:id', async (req, res) => {
+  try {
+    const db = await getDb();
+    const id = req.params.id;
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid testimonial ID.' });
+    }
+
+    const testimonial = await db.collection('testimonials').findOne({ _id: new ObjectId(id) });
+    if (!testimonial) {
+      return res.status(404).json({ message: 'Testimonial not found.' });
+    }
+
+    res.json(testimonial);
+  } catch (error) {
+    console.error(`Error fetching testimonial ${req.params.id}:`, error);
+    res.status(500).json({ message: 'Error fetching testimonial', error: error.message });
+  }
+});
+
+
+router.post('/', firebaseAuthMiddleware, async (req, res) => {
+  try {
+    const db = await getDb();
+    const userId = req.firebaseUser.uid;
+    const { message, userName } = req.body;
+
+    if (!message || message.trim().length === 0) {
+      return res.status(400).json({ message: 'Message is required.' });
+    }
+
+    const name = userName && userName.trim().length > 0
+      ? userName.trim()
+      : (req.firebaseUser.name || req.firebaseUser.email || 'Anonymous');
+
+    const testimonial = {
+      userId,
+      userName: name,
+      message: message.trim(),
+      date: new Date()
+    };
+
+    const result = await db.collection('testimonials').insertOne(testimonial);
+
+    res.status(201).json({
+      message: 'Testimonial submitted successfully!',
+      testimonialId: result.insertedId,
+      testimonial: { _id: result.insertedId, ...testimonial }
+    });
+  } catch (error) {
+    console.error('Error submitting testimonial:', error);
+    res.status(500).json({ message: 'Error submitting testimonial', error: error.message });
+  }
+});
+
+
+router.get('/my-testimonials', firebaseAuthMiddleware, async (req, res) => {
+  try {
+    const db = await getDb();
+    const userId = req.firebaseUser.uid;
+
+    const userTestimonials = await db.collection('testimonials')
+      .find({ userId: userId })
+      .sort({ date: -1 })
+      .toArray();
+
+    res.json(userTestimonials);
+  } catch (error) {
+    console.error(`Error fetching testimonials for user ${req.firebaseUser.uid}:`, error);
+    res.status(500).json({ message: 'Error fetching user testimonials', error: error.message });
+  }
+});
+
+module.exports = router;

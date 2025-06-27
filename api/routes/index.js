@@ -21,6 +21,10 @@ router.use('/products', require('./products'));
 // Public/private logic is handled within 'reviews.js'.
 router.use('/reviews', require('./reviews'));
 
+// Testimonials routes (public)  
+// Handles fetching and posting testimonials
+router.use('/testimonials', require('./testimonials'));
+
 // These routes require authentication for ALL their endpoints.
 router.use('/cart', firebaseAuthMiddleware, require('./cart'));
 router.use('/orders', firebaseAuthMiddleware, require('./orders'));
