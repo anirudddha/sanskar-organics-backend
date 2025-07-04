@@ -29,12 +29,12 @@ exports.createPost = async (req, res) => {
         const newPost = {
             en: {
                 title: en.title,
-                slug: slugify(en.title),
+                slug: slugify(en.slug || en.title),
                 content: en.content || '',
             },
             mr: {
                 title: mr.title,
-                slug: slugify(mr.title),
+                slug: slugify(mr.slug || mr.title),
                 content: mr.content || '',
             },
             author: 'Sanskar Organics Admin',
@@ -112,17 +112,24 @@ exports.updatePost = async (req, res) => {
             'updatedAt': new Date()
         };
 
-        if (en && en.title) {
-            updateFields['en.title'] = en.title;
-            updateFields['en.slug'] = slugify(en.title);
+                // --- MODIFIED LOGIC for English ---
+        if (en) {
+            if (en.title) updateFields['en.title'] = en.title;
+            if (en.content !== undefined) updateFields['en.content'] = en.content;
+            // Always update the slug if either a new slug or new title is provided
+            if (en.slug || en.title) {
+                updateFields['en.slug'] = slugify(en.slug || en.title);
+            }
         }
-        if (en && en.content !== undefined) updateFields['en.content'] = en.content;
-
-        if (mr && mr.title) {
-            updateFields['mr.title'] = mr.title;
-            updateFields['mr.slug'] = slugify(mr.title);
+        
+        // --- MODIFIED LOGIC for Marathi ---
+        if (mr) {
+            if (mr.title) updateFields['mr.title'] = mr.title;
+            if (mr.content !== undefined) updateFields['mr.content'] = mr.content;
+            if (mr.slug || mr.title) {
+                updateFields['mr.slug'] = slugify(mr.slug || mr.title);
+            }
         }
-        if (mr && mr.content !== undefined) updateFields['mr.content'] = mr.content;
 
         if (featuredImage !== undefined) updateFields.featuredImage = featuredImage;
         if (tags !== undefined) updateFields.tags = tags;
