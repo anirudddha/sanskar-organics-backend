@@ -51,7 +51,7 @@ exports.createPost = async (req, res) => {
     } catch (error) {
         // Unique index should be on 'en.slug' and 'mr.slug' in the DB
         if (error.code === 11000) {
-           return res.status(409).json({ message: 'A blog post with this English or Marathi title already exists.' });
+            return res.status(409).json({ message: 'A blog post with this English or Marathi title already exists.' });
         }
         console.error("Error creating blog post:", error);
         res.status(500).json({ message: 'Server Error', error: error.message });
@@ -81,8 +81,16 @@ exports.getAllPosts = async (req, res) => {
 exports.getPostBySlug = async (req, res) => {
     try {
         const db = await getDb();
-        const post = await db.collection('blogposts').findOne({ slug: req.params.slug });
-        
+        const slug = req.params.slug;
+
+        // Find a post where the slug matches either the English or Marathi slug
+        const post = await db.collection('blogposts').findOne({
+            $or: [
+                { 'en.slug': slug },
+                { 'mr.slug': slug }
+            ]
+        });
+
         if (!post) {
             return res.status(404).json({ message: 'Blog post not found.' });
         }
@@ -100,19 +108,19 @@ exports.updatePost = async (req, res) => {
     try {
         const db = await getDb();
         const postId = req.params.id;
-        
+
         if (!ObjectId.isValid(postId)) {
             return res.status(400).json({ message: 'Invalid post ID format.' });
         }
 
         const { en, mr, featuredImage, tags, status } = req.body;
-        
+
         // Using dot notation to update nested fields
         const updateFields = {
             'updatedAt': new Date()
         };
 
-                // --- MODIFIED LOGIC for English ---
+        // --- MODIFIED LOGIC for English ---
         if (en) {
             if (en.title) updateFields['en.title'] = en.title;
             if (en.content !== undefined) updateFields['en.content'] = en.content;
@@ -121,7 +129,7 @@ exports.updatePost = async (req, res) => {
                 updateFields['en.slug'] = slugify(en.slug || en.title);
             }
         }
-        
+
         // --- MODIFIED LOGIC for Marathi ---
         if (mr) {
             if (mr.title) updateFields['mr.title'] = mr.title;
@@ -134,7 +142,7 @@ exports.updatePost = async (req, res) => {
         if (featuredImage !== undefined) updateFields.featuredImage = featuredImage;
         if (tags !== undefined) updateFields.tags = tags;
         if (status) updateFields.status = status;
-        
+
         const result = await db.collection('blogposts').updateOne(
             { _id: new ObjectId(postId) },
             { $set: updateFields }
@@ -147,7 +155,7 @@ exports.updatePost = async (req, res) => {
 
     } catch (error) {
         if (error.code === 11000) {
-           return res.status(409).json({ message: 'A blog post with this English or Marathi title already exists.' });
+            return res.status(409).json({ message: 'A blog post with this English or Marathi title already exists.' });
         }
         console.error("Error updating blog post:", error);
         res.status(500).json({ message: 'Server Error', error: error.message });
@@ -171,7 +179,7 @@ exports.deletePost = async (req, res) => {
         if (result.deletedCount === 0) {
             return res.status(404).json({ message: 'Blog post not found.' });
         }
-        
+
         res.status(200).json({ message: 'Blog post removed successfully.' });
 
     } catch (error) {
@@ -208,7 +216,7 @@ exports.getPostById = async (req, res) => {
         }
 
         const post = await db.collection('blogposts').findOne({ _id: new ObjectId(postId) });
-        
+
         if (!post) {
             return res.status(404).json({ message: 'Blog post not found.' });
         }
