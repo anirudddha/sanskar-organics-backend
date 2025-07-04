@@ -25,6 +25,9 @@ router.use('/reviews', require('./reviews'));
 // Handles fetching and posting testimonials
 router.use('/testimonials', require('./testimonials'));
 
+// NEW: Blog routes. Public/private logic is handled within 'blog.js'
+router.use('/blog', require('./blog'));
+
 // These routes require authentication for ALL their endpoints.
 router.use('/cart', firebaseAuthMiddleware, require('./cart'));
 router.use('/orders', firebaseAuthMiddleware, require('./orders'));
