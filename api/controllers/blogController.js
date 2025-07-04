@@ -162,3 +162,42 @@ exports.deletePost = async (req, res) => {
         res.status(500).json({ message: 'Server Error', error: error.message });
     }
 };
+
+
+exports.getAllPostsAdmin = async (req, res) => {
+    try {
+        const db = await getDb();
+        const posts = await db.collection('blogposts')
+            .find({}) // Find all, no status filter
+            .sort({ createdAt: -1 })
+            .toArray();
+        res.status(200).json(posts);
+    } catch (error) {
+        console.error("Error fetching all posts for admin:", error);
+        res.status(500).json({ message: 'Server Error', error: error.message });
+    }
+};
+
+// @desc    Get a single blog post by its ID for editing
+// @route   GET /api/blog/admin/:id
+// @access  Private/Admin (API Key)
+exports.getPostById = async (req, res) => {
+    try {
+        const db = await getDb();
+        const postId = req.params.id;
+
+        if (!ObjectId.isValid(postId)) {
+            return res.status(400).json({ message: 'Invalid post ID format.' });
+        }
+
+        const post = await db.collection('blogposts').findOne({ _id: new ObjectId(postId) });
+        
+        if (!post) {
+            return res.status(404).json({ message: 'Blog post not found.' });
+        }
+        res.status(200).json(post);
+    } catch (error) {
+        console.error("Error fetching post by ID for admin:", error);
+        res.status(500).json({ message: 'Server Error', error: error.message });
+    }
+};
