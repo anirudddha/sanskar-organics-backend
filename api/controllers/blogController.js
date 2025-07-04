@@ -19,18 +19,25 @@ const slugify = (text) => {
 exports.createPost = async (req, res) => {
     try {
         const db = await getDb();
-        const { title, content, featuredImage, tags, status } = req.body;
+        const { en, mr, featuredImage, tags, status } = req.body;
 
-        if (!title || !content) {
-            return res.status(400).json({ message: 'Title and content are required.' });
+        // Validate that both language titles are present
+        if (!en || !en.title || !mr || !mr.title) {
+            return res.status(400).json({ message: 'English and Marathi titles are required.' });
         }
 
-        // Manually create the document to be inserted
         const newPost = {
-            title,
-            slug: slugify(title), // Generate slug here
-            content,
-            author: 'Sanskar Organics Admin', // Or from req.user.name if you want
+            en: {
+                title: en.title,
+                slug: slugify(en.title),
+                content: en.content || '',
+            },
+            mr: {
+                title: mr.title,
+                slug: slugify(mr.title),
+                content: mr.content || '',
+            },
+            author: 'Sanskar Organics Admin',
             featuredImage: featuredImage || '',
             tags: tags || [],
             status: status || 'published',
@@ -39,14 +46,12 @@ exports.createPost = async (req, res) => {
         };
 
         const result = await db.collection('blogposts').insertOne(newPost);
-        
-        // Return the document that was just created
         res.status(201).json({ ...newPost, _id: result.insertedId });
 
     } catch (error) {
-        // Handle MongoDB's duplicate key error (if you have a unique index on slug/title)
+        // Unique index should be on 'en.slug' and 'mr.slug' in the DB
         if (error.code === 11000) {
-           return res.status(409).json({ message: 'A blog post with this title already exists.' });
+           return res.status(409).json({ message: 'A blog post with this English or Marathi title already exists.' });
         }
         console.error("Error creating blog post:", error);
         res.status(500).json({ message: 'Server Error', error: error.message });
@@ -100,20 +105,27 @@ exports.updatePost = async (req, res) => {
             return res.status(400).json({ message: 'Invalid post ID format.' });
         }
 
-        const { title, content, featuredImage, tags, status } = req.body;
+        const { en, mr, featuredImage, tags, status } = req.body;
         
+        // Using dot notation to update nested fields
         const updateFields = {
-            updatedAt: new Date()
+            'updatedAt': new Date()
         };
 
-        // Dynamically add fields to the update object if they exist in the request
-        if (title) {
-            updateFields.title = title;
-            updateFields.slug = slugify(title); // Also update the slug if title changes
+        if (en && en.title) {
+            updateFields['en.title'] = en.title;
+            updateFields['en.slug'] = slugify(en.title);
         }
-        if (content) updateFields.content = content;
-        if (featuredImage) updateFields.featuredImage = featuredImage;
-        if (tags) updateFields.tags = tags;
+        if (en && en.content !== undefined) updateFields['en.content'] = en.content;
+
+        if (mr && mr.title) {
+            updateFields['mr.title'] = mr.title;
+            updateFields['mr.slug'] = slugify(mr.title);
+        }
+        if (mr && mr.content !== undefined) updateFields['mr.content'] = mr.content;
+
+        if (featuredImage !== undefined) updateFields.featuredImage = featuredImage;
+        if (tags !== undefined) updateFields.tags = tags;
         if (status) updateFields.status = status;
         
         const result = await db.collection('blogposts').updateOne(
@@ -124,13 +136,11 @@ exports.updatePost = async (req, res) => {
         if (result.matchedCount === 0) {
             return res.status(404).json({ message: 'Blog post not found.' });
         }
-
         res.status(200).json({ message: 'Blog post updated successfully.' });
 
-    } catch (error)
-    {
+    } catch (error) {
         if (error.code === 11000) {
-           return res.status(409).json({ message: 'A blog post with this title already exists.' });
+           return res.status(409).json({ message: 'A blog post with this English or Marathi title already exists.' });
         }
         console.error("Error updating blog post:", error);
         res.status(500).json({ message: 'Server Error', error: error.message });
