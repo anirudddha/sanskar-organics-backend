@@ -28,8 +28,8 @@ router.get('/admin/:id', apiKeyAuthMiddleware, getPostById);
 
 
 // Admin Routes (require authentication and admin privileges)
-router.post('/', firebaseAuthMiddleware, apiKeyAuthMiddleware, createPost);
-router.put('/:id', firebaseAuthMiddleware, apiKeyAuthMiddleware, updatePost);
-router.delete('/:id', firebaseAuthMiddleware, apiKeyAuthMiddleware, deletePost);
+router.post('/', apiKeyAuthMiddleware, createPost);
+router.put('/:id', apiKeyAuthMiddleware, updatePost);
+router.delete('/:id', apiKeyAuthMiddleware, deletePost);
 
 module.exports = router;
