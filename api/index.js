@@ -10,6 +10,7 @@ const { initializeFirebaseAdmin } = require('./config/firebaseConfig');
 initializeFirebaseAdmin();
 
 const apiRoutes = require('./routes');
+const shiprocketRoutes = require('./routes/shiprocket');
 const app = express();
 
 // build your whitelist
@@ -37,6 +38,10 @@ app.use(cors({
 }));
 
 app.use('/api', apiRoutes);
+
+// Shiprocket integration
+// POST /api/shiprocket/ship
+app.use('/api/shiprocket', shiprocketRoutes);
 
 app.use((req, res) => res.status(404).json({ message: 'Endpoint not found' }));
 app.use((err, req, res, next) => {
