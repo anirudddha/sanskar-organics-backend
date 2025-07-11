@@ -59,6 +59,7 @@ router.post('/', async (req, res) => {
             if (variantDetails) {
                 itemPrice = variantDetails.price;
                 itemUnit = variantDetails.unit;
+                itemWeight = variantDetails.weight_in_grams;
                 itemVariantDetails = variantDetails;
             }
             else {
@@ -67,7 +68,8 @@ router.post('/', async (req, res) => {
                 // Store the variant details for matching later
                 itemVariantDetails = {
                     unit: selectedVariant.unit,
-                    price: selectedVariant.price // Store the price from the variant
+                    price: selectedVariant.price, // Store the price from the variant
+                    weight_in_grams:selectedVariant.weight_in_grams
                 };
             }
 
