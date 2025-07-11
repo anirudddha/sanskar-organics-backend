@@ -16,17 +16,17 @@ async function ship(req, res) {
   try {
     const order = await createOrder(req.body.orderPayload);
 
-        console.log('✅ Response from createOrder:', JSON.stringify(order, null, 2));
+    console.log('✅ Response from createOrder:', JSON.stringify(order, null, 2));
 
     // ✅ FIX: Pass the shipment_id, not the order_id, to schedule the pickup.
     // The createOrder response contains both.
-    await schedulePickup(order.shipment_id); 
+    await schedulePickup(order.shipment_id);
 
     const details = await getOrderDetails(order.order_id);
 
     return res.json({ success: true, order, tracking: {
-      awb: details.data.awb_code,
-      url: details.data.tracking_url
+        awb: details.data.awb_code,
+        url: details.data.tracking_url
     }});
   } catch (err) {
     if (err.response) {
@@ -45,7 +45,7 @@ async function ship(req, res) {
 
 
 async function rates(req, res) {
-  const { pickup_pincode, delivery_pincode, weight, cod } = req.body;
+  const { pickup_pincode, delivery_pincode, weight, cod } = req.query;
 
   if (!pickup_pincode || !delivery_pincode || !weight || cod === undefined) {
     return res.status(400).json({
@@ -68,4 +68,4 @@ async function rates(req, res) {
 
 
 
-module.exports = { ship,rates };
+module.exports = { ship, rates };
