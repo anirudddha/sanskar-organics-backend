@@ -8,8 +8,8 @@ const apiKeyAuthMiddleware = require('../middleware/apiKeyAuthMiddleware')
 
 router.use(apiKeyAuthMiddleware);
 
+// --- ORDER ROUTES (Unchanged) ---
 // GET all orders
-// Accessible at: GET /admin/orders/allorders
 router.get('/orders/allorders', async (req, res) => {
     try {
         const db = await getDb();
@@ -25,18 +25,14 @@ router.get('/orders/allorders', async (req, res) => {
 });
 
 // GET a specific order by its ID
-// Accessible at: GET /admin/orders/:orderId
 router.get('/orders/:orderId', async (req, res) => {
     try {
         const db = await getDb();
         const orderId = req.params.orderId;
-
         if (!ObjectId.isValid(orderId)) {
             return res.status(400).json({ message: "Invalid order ID format." });
         }
-
         const order = await db.collection('orders').findOne({ _id: new ObjectId(orderId) });
-
         if (!order) {
             return res.status(404).json({ message: "Order not found." });
         }
@@ -48,35 +44,28 @@ router.get('/orders/:orderId', async (req, res) => {
 });
 
 // PUT update order status
-// Accessible at: PUT /admin/orders/:orderId/status
 router.put('/orders/:orderId/status', async (req, res) => {
     try {
         const db = await getDb();
         const orderId = req.params.orderId;
         const { status } = req.body;
-
         if (!ObjectId.isValid(orderId)) {
             return res.status(400).json({ message: "Invalid order ID format." });
         }
-
         if (!status) {
             return res.status(400).json({ message: "Status is required to update." });
         }
-
         const allowedStatuses = ['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'];
         if (!allowedStatuses.includes(status)) {
             return res.status(400).json({ message: `Invalid status. Allowed statuses are: ${allowedStatuses.join(', ')}.` });
         }
-
         const result = await db.collection('orders').updateOne(
             { _id: new ObjectId(orderId) },
             { $set: { status: status, lastStatusUpdate: new Date() } }
         );
-
         if (result.matchedCount === 0) {
             return res.status(404).json({ message: "Order not found." });
         }
-
         res.json({ message: "Order status updated successfully." });
     } catch (error) {
         console.error("Error updating order status for admin:", error);
@@ -84,12 +73,13 @@ router.put('/orders/:orderId/status', async (req, res) => {
     }
 });
 
+// --- PRODUCT ROUTES (Expanded) ---
 
+// GET all products
 router.get('/products/all', async (req, res) => {
     try {
         const db = await getDb();
-        // Fetch all products, perhaps with more details than the public API
-        const products = await db.collection('products').find({}).toArray();
+        const products = await db.collection('products').find({}).sort({ name: 1 }).toArray();
         res.json(products);
     } catch (error) {
         console.error("Error fetching all products for admin:", error);
@@ -97,35 +87,111 @@ router.get('/products/all', async (req, res) => {
     }
 });
 
-// POST to create a new product (example for admin)
-// Accessible at: POST /admin/products/create
+// ** NEW ** GET a single product by ID
+router.get('/products/:productId', async (req, res) => {
+    try {
+        const db = await getDb();
+        const { productId } = req.params;
+
+        if (!ObjectId.isValid(productId)) {
+            return res.status(400).json({ message: "Invalid product ID format." });
+        }
+
+        const product = await db.collection('products').findOne({ _id: new ObjectId(productId) });
+
+        if (!product) {
+            return res.status(404).json({ message: "Product not found." });
+        }
+        res.json(product);
+    } catch (error) {
+        console.error("Error fetching single product for admin:", error);
+        res.status(500).json({ message: "Error fetching product", error: error.message });
+    }
+});
+
+
+// POST to create a new product
 router.post('/products/create', async (req, res) => {
     try {
         const db = await getDb();
-        const newProduct = req.body; // Assuming the frontend sends the product data
+        const productData = req.body;
 
-        // Basic validation (add more as needed)
-        if (!newProduct || !newProduct.name || !newProduct.price) {
+        if (!productData || !productData.name || !productData.price) {
             return res.status(400).json({ message: "Product name and price are required." });
         }
 
-        // You might want to add default values, categorize, handle images etc.
         const productWithDefaults = {
-            ...newProduct,
+            ...productData,
+            images: Array.isArray(productData.images) ? productData.images : [],
+            price: parseFloat(productData.price),
+            stock: parseInt(productData.stock, 10) || 0,
             createdAt: new Date(),
             updatedAt: new Date(),
-            // Add other fields like isActive, stock, etc. if applicable
-            isActive: newProduct.isActive === undefined ? true : newProduct.isActive,
-            stock: newProduct.stock === undefined ? 0 : newProduct.stock,
-            // Handle image uploads separately if complex
+            isActive: productData.isActive === undefined ? true : productData.isActive,
         };
 
         const result = await db.collection('products').insertOne(productWithDefaults);
-        res.status(201).json({ message: "Product created successfully", productId: result.insertedId });
-
+        res.status(201).json({ message: "Product created successfully", product: { _id: result.insertedId, ...productWithDefaults } });
     } catch (error) {
         console.error("Error creating product for admin:", error);
         res.status(500).json({ message: "Error creating product", error: error.message });
+    }
+});
+
+// ** NEW ** PUT to update an existing product
+router.put('/products/:productId', async (req, res) => {
+    try {
+        const db = await getDb();
+        const { productId } = req.params;
+        const updateData = req.body;
+
+        if (!ObjectId.isValid(productId)) {
+            return res.status(400).json({ message: "Invalid product ID format." });
+        }
+
+        // Remove _id from update data to prevent errors
+        delete updateData._id;
+
+        // Ensure numbers are stored correctly
+        if (updateData.price) updateData.price = parseFloat(updateData.price);
+        if (updateData.stock) updateData.stock = parseInt(updateData.stock, 10);
+        
+        const result = await db.collection('products').updateOne(
+            { _id: new ObjectId(productId) },
+            { $set: { ...updateData, updatedAt: new Date() } }
+        );
+
+        if (result.matchedCount === 0) {
+            return res.status(404).json({ message: "Product not found." });
+        }
+
+        res.json({ message: "Product updated successfully." });
+    } catch (error) {
+        console.error("Error updating product for admin:", error);
+        res.status(500).json({ message: "Error updating product", error: error.message });
+    }
+});
+
+// ** NEW ** DELETE a product
+router.delete('/products/:productId', async (req, res) => {
+    try {
+        const db = await getDb();
+        const { productId } = req.params;
+
+        if (!ObjectId.isValid(productId)) {
+            return res.status(400).json({ message: "Invalid product ID format." });
+        }
+
+        const result = await db.collection('products').deleteOne({ _id: new ObjectId(productId) });
+
+        if (result.deletedCount === 0) {
+            return res.status(404).json({ message: "Product not found." });
+        }
+
+        res.json({ message: "Product deleted successfully." });
+    } catch (error) {
+        console.error("Error deleting product for admin:", error);
+        res.status(500).json({ message: "Error deleting product", error: error.message });
     }
 });
 
