@@ -1,14 +1,22 @@
-// api/routes/cart.js
+// api/routes/cart.js (FIXED)
 const express = require('express');
 const router = express.Router();
-const { getDb } = require('../db');
+// Assuming your db connection is in a services directory as per your structure
+const { getDb } = require('../db'); 
 const { ObjectId } = require('mongodb');
 
 // GET user's cart
 router.get('/', async (req, res) => {
     try {
         const db = await getDb();
-        const userId = req.firebaseUser.uid;
+        // FIX: Use the standardized req.user object from the unified middleware
+        const userId = req.user.userId;
+
+        // Safety check
+        if (!userId) {
+            return res.status(403).json({ message: "User ID not found in token." });
+        }
+
         const cart = await db.collection('carts').findOne({ userId: userId });
 
         if (cart) {
@@ -32,7 +40,8 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
     try {
         const db = await getDb();
-        const userId = req.firebaseUser.uid;
+        // FIX: Use the standardized req.user object from the unified middleware
+        const userId = req.user.userId;
         const { productId, quantity, selectedVariant, variantDetails } = req.body;
 
         if (!productId || !quantity || quantity <= 0) {
@@ -51,35 +60,27 @@ router.post('/', async (req, res) => {
 
         if (product.variants && product.variants.length > 0) {
             if ((!selectedVariant || selectedVariant.unit === undefined || selectedVariant.price === undefined) && !variantDetails) {
-                // If product has variants, frontend MUST send selectedVariant details
                 return res.status(400).json({ message: "Selected variant details are required for this product." });
             }
-            // Use the price and unit from the selected variant
-
+            
             if (variantDetails) {
                 itemPrice = variantDetails.price;
                 itemUnit = variantDetails.unit;
-                // itemWeight = variantDetails.weight_in_grams;
                 itemVariantDetails = variantDetails;
-            }
-            else {
+            } else {
                 itemPrice = selectedVariant.price;
                 itemUnit = selectedVariant.unit;
-                // Store the variant details for matching later
                 itemVariantDetails = {
                     unit: selectedVariant.unit,
-                    price: selectedVariant.price, // Store the price from the variant
+                    price: selectedVariant.price,
                     weight_in_grams:selectedVariant?.weight_in_grams
                 };
             }
-
         }
 
-        // Sanitize price and quantity before storing
         const sanitizedPrice = typeof itemPrice === 'number' && itemPrice !== null ? itemPrice : 0;
         const sanitizedQuantity = typeof quantity === 'number' ? quantity : 1;
 
-        // Find the user's cart or create one
         let cart = await db.collection('carts').findOne({ userId: userId });
 
         if (!cart) {
@@ -91,34 +92,27 @@ router.post('/', async (req, res) => {
             };
         }
 
-        // Check if the product with the SAME variant is already in the cart
         const existingItemIndex = cart.items.findIndex(item =>
-            item.productId === parseInt(productId) && // Match by productId
-            JSON.stringify(item.variantDetails) === JSON.stringify(itemVariantDetails) // Match by variant details (as objects)
+            item.productId === parseInt(productId) &&
+            JSON.stringify(item.variantDetails) === JSON.stringify(itemVariantDetails)
         );
 
         if (existingItemIndex > -1) {
-            // Item (with this variant) already exists, update quantity
             cart.items[existingItemIndex].quantity = sanitizedQuantity;
-            // Important: If price could change for a variant, you might need to re-evaluate.
-            // For simplicity, we keep the price from when it was first added or updated.
-            // cart.items[existingItemIndex].price = sanitizedPrice; // Option to update price if needed
         } else {
-            // Add new item to the cart with variant details
             cart.items.push({
                 productId: parseInt(productId),
                 name: product.name,
                 price: sanitizedPrice,
                 quantity: sanitizedQuantity,
-                unit: itemUnit, // Store the unit (e.g., '250g')
-                variantDetails: itemVariantDetails, // Store the variant details object for accurate matching
+                unit: itemUnit,
+                variantDetails: itemVariantDetails,
                 addedAt: new Date()
             });
         }
 
         cart.updatedAt = new Date();
 
-        // Update or insert the cart
         const result = await db.collection('carts').updateOne(
             { userId: userId },
             { $set: cart },
@@ -137,20 +131,13 @@ router.post('/', async (req, res) => {
 });
 
 // DELETE (Remove item from cart)
-// This needs to be able to remove specific items, potentially by productId AND variant details.
-// For now, it removes all items matching productId, which might be too broad if variants exist.
-// A more robust solution would require sending variant info (e.g., unit) in the URL or body.
-// For simplicity, let's assume removing by productId is acceptable for now.
-// If you need to remove a SPECIFIC variant, the route might need to be like /cart/item/:itemId or /cart/:productId/:variantUnit
 router.delete('/:productId', async (req, res) => {
     try {
         const db = await getDb();
-        const userId = req.firebaseUser.uid;
+        // FIX: Use the standardized req.user object from the unified middleware
+        const userId = req.user.userId;
         const productIdToRemove = parseInt(req.params.productId);
         const variantUnit = req.body.variant;
-        // To remove a specific variant, you'd need its unit or a unique cart item ID.
-        // For now, we'll assume it removes ALL instances of this productId from the cart.
-        // If you need to remove a specific variant, the frontend needs to send that info.
 
         if (isNaN(productIdToRemove)) {
             return res.status(400).json({ message: "Invalid product ID. Must be a number." });
@@ -163,16 +150,13 @@ router.delete('/:productId', async (req, res) => {
         }
 
         const initialItemCount = cart.items.length;
-        // Filter out the item to remove based on productId.
-        // If you need to remove a SPECIFIC variant, you'd add another condition here,
-        // e.g., `item => item.productId !== productIdToRemove || item.unit !== req.body.variantUnitToRemove`
         cart.items = cart.items.filter(item =>
             item.productId !== productIdToRemove
             || item.variantDetails?.unit !== variantUnit
         );
 
         if (cart.items.length === initialItemCount) {
-            return res.status(404).json({ message: `Product with ID ${productIdToRemove} not found in cart.` });
+            return res.status(404).json({ message: `Product with ID ${productIdToRemove} and specified variant not found in cart.` });
         }
 
         cart.updatedAt = new Date();
@@ -197,7 +181,8 @@ router.delete('/:productId', async (req, res) => {
 router.delete('/', async (req, res) => {
     try {
         const db = await getDb();
-        const userId = req.firebaseUser.uid;
+        // FIX: Use the standardized req.user object from the unified middleware
+        const userId = req.user.userId;
         const result = await db.collection('carts').deleteOne({ userId: userId });
 
         if (result.deletedCount > 0) {
