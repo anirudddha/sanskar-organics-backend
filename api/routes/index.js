@@ -3,36 +3,39 @@ const express = require('express');
 const router = express.Router();
 
 const { initializeFirebaseAdmin } = require('../config/firebaseConfig');
+// IMPORT BOTH MIDDLEWARES
 const firebaseAuthMiddleware = require('../middleware/firebaseAuthMiddleware');
+const jwtAuthMiddleware = require('../middleware/jwtAuthMiddleware');
 
-// Initialize Firebase Admin SDK
 initializeFirebaseAdmin();
 
-// Public route for API status
-router.get('/', (req, res) => {
-    res.send('Sanskar Organics Backend API is running!');
-});
-
-// All requests starting with /products are handled by the products router.
-// Public/private logic is handled within 'products.js'.
+// --- Public Routes ---
+router.get('/', (req, res) => res.send('Sanskar Organics Backend API is running!'));
+router.use('/auth', require('./auth')); // For local register/login
 router.use('/products', require('./products'));
-
-// All requests starting with /reviews are handled by the reviews router.
-// Public/private logic is handled within 'reviews.js'.
 router.use('/reviews', require('./reviews'));
-
-// Testimonials routes (public)  
-// Handles fetching and posting testimonials
 router.use('/testimonials', require('./testimonials'));
-
-// NEW: Blog routes. Public/private logic is handled within 'blog.js'
 router.use('/blog', require('./blog'));
 
-// These routes require authentication for ALL their endpoints.
-router.use('/cart', firebaseAuthMiddleware, require('./cart'));
-router.use('/orders', firebaseAuthMiddleware, require('./orders'));
-router.use('/addresses', firebaseAuthMiddleware, require('./addresses'));
+// --- Protected Routes ---
+// EXAMPLE: Let's say '/cart' and '/addresses' can be accessed by ANY logged-in user,
+// but '/orders' can ONLY be accessed by Firebase users.
 
+// These routes require a valid FIREBASE token.
+router.use('/orders', firebaseAuthMiddleware, require('./orders'));
+
+// These routes require a valid LOCAL JWT token.
+// For example, if you had a route for local users to change their password.
+// router.use('/user/change-password', jwtAuthMiddleware, require('./userProfileRoutes'));
+
+
+// Cleanest Approach (Using a Unified Middleware for Shared Routes)
+const unifiedAuthMiddleware = require('../middleware/unifiedAuthMiddleware'); // You would need to create this file as shown in the previous answer.
+router.use('/cart', unifiedAuthMiddleware, require('./cart'));
+router.use('/addresses', unifiedAuthMiddleware, require('./addresses'));
+
+
+// --- Admin Routes ---
 router.use('/admin', require('./admin')); 
 
 module.exports = router;
