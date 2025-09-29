@@ -22,7 +22,7 @@ router.use('/blog', require('./blog'));
 // but '/orders' can ONLY be accessed by Firebase users.
 
 // These routes require a valid FIREBASE token.
-router.use('/orders', firebaseAuthMiddleware, require('./orders'));
+// router.use('/orders', firebaseAuthMiddleware, require('./orders'));
 
 // These routes require a valid LOCAL JWT token.
 // For example, if you had a route for local users to change their password.
@@ -33,7 +33,7 @@ router.use('/orders', firebaseAuthMiddleware, require('./orders'));
 const unifiedAuthMiddleware = require('../middleware/unifiedAuthMiddleware'); // You would need to create this file as shown in the previous answer.
 router.use('/cart', unifiedAuthMiddleware, require('./cart'));
 router.use('/addresses', unifiedAuthMiddleware, require('./addresses'));
-
+router.use('/orders', unifiedAuthMiddleware, require('./orders'));
 
 // --- Admin Routes ---
 router.use('/admin', require('./admin')); 
